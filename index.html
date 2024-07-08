@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction Listing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #ec840d;
+        }
+        .statistics {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .stat-box {
+            border: 1px solid black;
+            padding: 20px;
+            text-align: center;
+        }
+        .pagination {
+            margin-top: 20px;
+        }
+        .pagination button {
+            padding: 10px;
+            margin-right: 10px;
+            background: rgb(241, 173, 45);
+            color: black;
+        }
+        .chart-container {
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transaction Listing</h1>
+    
+    <label for="month-select">Select Month:</label>
+    <select id="month-select">
+        <option value="1">January</option>
+        <option value="2">February</option>
+        <option value="3" selected>March</option>
+        <option value="4">April</option>
+        <option value="5">May</option>
+        <option value="6">June</option>
+        <option value="7">July</option>
+        <option value="8">August</option>
+        <option value="9">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+    </select>
+    
+    <input type="text" id="search-box" placeholder="Search transactions">
+
+    <div class="statistics">
+        <div class="stat-box" id="total-sale">Total Sale: $0</div>
+        <div class="stat-box" id="total-sold-items">Total Sold Items: 0</div>
+        <div class="stat-box" id="total-not-sold-items">Total Not Sold Items: 0</div>
+    </div>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+        <tbody id="transaction-table-body">
+            <!-- Transactions will be dynamically inserted here -->
+        </tbody>
+    </table>
+    
+    <div class="pagination">
+        <button id="prev-button" disabled>Previous</button>
+        <button id="next-button" disabled>Next</button>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="transactions-chart"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const apiUrl = 'https://your-api-endpoint.com/transactions';
+        let currentPage = 1;
+        let searchQuery = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadTransactions();
+            loadStatistics();
+            loadChart();
+
+            document.getElementById('month-select').addEventListener('change', () => {
+                currentPage = 1;
+                loadTransactions();
+                loadStatistics();
+                loadChart();
+            });
+
+            document.getElementById('search-box').addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                currentPage = 1;
+                loadTransactions();
+            });
+
+            document.getElementById('prev-button').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    loadTransactions();
+                }
+            });
+
+            document.getElementById('next-button').addEventListener('click', () => {
+                currentPage++;
+                loadTransactions();
+            });
+        });
+
+        async function loadTransactions() {
+            const month = document.getElementById('month-select').value;
+            const response = await fetch(`${apiUrl}?month=${month}&page=${currentPage}&search=${searchQuery}`);
+            const data = await response.json();
+
+            const tableBody = document.getElementById('transaction-table-body');
+            tableBody.innerHTML = '';
+
+            data.transactions.forEach(transaction => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${transaction.title}</td>
+                    <td>${transaction.description}</td>
+                    <td>${transaction.price}</td>
+                    <td>${transaction.date}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+
+            document.getElementById('prev-button').disabled = !data.hasPreviousPage;
+            document.getElementById('next-button').disabled = !data.hasNextPage;
+        }
+
+        async function loadStatistics() {
+            const month = document.getElementById('month-select').value;
+            const response = await fetch(`${apiUrl}/statistics?month=${month}`);
+            const data = await response.json();
+
+            document.getElementById('total-sale').innerText = `Total Sale: $${data.totalSale}`;
+            document.getElementById('total-sold-items').innerText = `Total Sold Items: ${data.totalSoldItems}`;
+            document.getElementById('total-not-sold-items').innerText = `Total Not Sold Items: ${data.totalNotSoldItems}`;
+        }
+
+        async function loadChart() {
+            const month = document.getElementById('month-select').value;
+            const response = await fetch(`${apiUrl}/price-range?month=${month}`);
+            const data = await response.json();
+
+            const ctx = document.getElementById('transactions-chart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.priceRanges.map(range => `$${range.rangeStart} - $${range.rangeEnd}`),
+                    datasets: [{
+                        label: 'Number of Items',
+                        data: data.priceRanges.map(range => range.count),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
